@@ -43,7 +43,12 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=config.cors_origins,
+    allow_origins=[
+        "https://jodohku.my",
+        "https://www.jodohku.my",
+        "https://jodohku-api.onrender.com",
+        "*",  # sementara untuk debug
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -52,7 +57,12 @@ app.add_middleware(
 if config.app_env == "production":
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=["api.jodohku.my", "*.jodohku.my"],
+        allowed_hosts=[
+            "api.jodohku.my",
+            "*.jodohku.my",
+            "jodohku-api.onrender.com",  # ← tambah ini
+            "*.onrender.com",             # ← dan ini
+        ],
     )
 
 
