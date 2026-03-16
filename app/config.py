@@ -2,7 +2,6 @@
 JODOHKU.MY — Application Configuration
 Centralized settings management using pydantic-settings
 """
-
 from functools import lru_cache
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -42,6 +41,11 @@ class Settings(BaseSettings):
     jwt_access_token_expire_minutes: int = 30
     jwt_refresh_token_expire_days: int = 30
 
+    # ── Brevo Email API ──
+    brevo_api_key: str = ""
+    brevo_sender_email: str = "noreply@jodohku.my"
+    brevo_sender_name: str = "Jodohku.my"
+
     # ── ToyyibPay ──
     toyyibpay_secret_key: str = ""
     toyyibpay_category_code: str = ""
@@ -75,13 +79,6 @@ class Settings(BaseSettings):
     fcm_server_key: str = ""
     fcm_project_id: str = ""
 
-    # ── Email ──
-    smtp_host: str = "smtp.gmail.com"
-    smtp_port: int = 587
-    smtp_user: str = ""
-    smtp_password: str = ""
-    smtp_from_name: str = "Jodohku.my"
-
     # ── WhatsApp Business API ──
     whatsapp_api_url: str = "https://graph.facebook.com/v18.0"
     whatsapp_access_token: str = ""
@@ -98,6 +95,17 @@ class Settings(BaseSettings):
     # ── Rate Limiting ──
     rate_limit_per_minute: int = 60
     rate_limit_login_per_minute: int = 5
+
+    # ── Business Logic ──
+    daily_candidates: int = 5
+    daily_reset_hour: int = 8
+    free_msg_limit: int = 10
+    pioneer_quota: int = 3000
+    pioneer_trial_days: int = 7
+
+    # ── URLs ──
+    frontend_url: str = "https://jodohku.my"
+    backend_url: str = "https://api.jodohku.my"
 
 
 @lru_cache()
