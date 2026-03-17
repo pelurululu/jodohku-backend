@@ -8,7 +8,6 @@ Run: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import get_settings
 from app.database import init_db, close_db
@@ -22,10 +21,8 @@ config = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
-    # Startup
     await init_db()
     yield
-    # Shutdown
     await close_db()
 
 
@@ -39,31 +36,32 @@ app = FastAPI(
 )
 
 
-# ─── Middleware ───
+# ─── CORS ───
+# Allow all jodohku.my origins + Render URL
+
+ALLOWED_ORIGINS = [
+    "https://jodohku.my",
+    "https://www.jodohku.my",
+    "https://jodohku-frontend.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:8080",
+    "http://127.0.0.1:5500",
+]
+
+# Also allow any extra origins from .env
+if config.cors_origins:
+    for origin in config.cors_origins:
+        if origin not in ALLOWED_ORIGINS:
+            ALLOWED_ORIGINS.append(origin)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://jodohku.my",
-        "https://www.jodohku.my",
-        "https://jodohku-api.onrender.com",
-        "*",  # sementara untuk debug
-    ],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
-
-if config.app_env == "production":
-    app.add_middleware(
-        TrustedHostMiddleware,
-        allowed_hosts=[
-            "api.jodohku.my",
-            "*.jodohku.my",
-            "jodohku-api.onrender.com",  # ← tambah ini
-            "*.onrender.com",             # ← dan ini
-        ],
-    )
 
 
 # ─── Mount API Routes ───
