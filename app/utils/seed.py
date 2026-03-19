@@ -5,14 +5,6 @@ Seeds tier configurations, quiz questions, and ice breakers.
 Run: python -m app.utils.seed
 """
 
-async def run_seed():
-    async with async_session() as db:
-        await seed_tiers(db)
-        await seed_questions(db)
-        await seed_icebreakers(db)
-        await db.commit()
-    print("[Seed] Done.")
-
 import asyncio
 import uuid
 from app.database import async_session, init_db
@@ -281,3 +273,9 @@ async def seed_all():
 
 if __name__ == "__main__":
     asyncio.run(seed_all())
+
+
+# Alias for lifespan import
+async def run_seed():
+    """Run seed — skips if data already exists."""
+    await seed_all()
