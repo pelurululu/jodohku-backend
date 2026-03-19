@@ -1,6 +1,7 @@
 """
 JODOHKU.MY — Database Seed Script
-Skips if data already exists (safe to run multiple times)
+Seeds tier configurations, quiz questions, and ice breakers.
+Safe to run multiple times — skips if data already exists.
 """
 
 import asyncio
@@ -19,6 +20,7 @@ TIER_SEED = [
     {"tier": SubscriptionTier.PREMIUM, "price_myr": 101.99, "duration_days": 90, "daily_profile_views": 9999, "max_concurrent_chats": 9999, "max_messages_per_chat": 9999, "whatsapp_requests_per_day": 5, "golden_tickets_per_month": 3, "has_clear_photos": True, "has_whatsapp_access": True, "has_priority_search": True, "has_invisible_mode": False, "has_video_taaruf": True, "has_human_matchmaker": False, "has_ctos_check": False, "has_monthly_report": True, "has_ads_free": True, "has_beta_features": True, "badge_label": "Premium", "badge_color": "#7C3AED"},
     {"tier": SubscriptionTier.SOVEREIGN, "price_myr": 1299.99, "duration_days": 30, "daily_profile_views": 9999, "max_concurrent_chats": 9999, "max_messages_per_chat": 9999, "whatsapp_requests_per_day": 10, "golden_tickets_per_month": 5, "has_clear_photos": True, "has_whatsapp_access": True, "has_priority_search": True, "has_invisible_mode": True, "has_video_taaruf": True, "has_human_matchmaker": True, "has_ctos_check": True, "has_monthly_report": True, "has_ads_free": True, "has_beta_features": True, "badge_label": "Sovereign", "badge_color": "#111114"},
 ]
+
 
 QUIZ_SEED = [
     {"domain": QuizDomain.COMMUNICATION, "seq": 1, "core": True, "ms": "Saya lebih suka berbincang secara terbuka apabila ada konflik daripada mendiamkan diri.", "en": "I prefer to discuss openly when there is conflict rather than staying silent."},
@@ -53,6 +55,7 @@ QUIZ_SEED = [
     {"domain": QuizDomain.RESILIENCE, "seq": 30, "core": False, "ms": "Saya tidak mudah berputus asa walaupun dalam situasi yang sangat sukar.", "en": "I don't easily give up even in very difficult situations."},
 ]
 
+
 ICEBREAKER_SEED = [
     {"ms": "Assalamualaikum! Apa yang buat anda tertarik untuk mendaftar di Jodohku?", "en": "Assalamualaikum! What made you interested in joining Jodohku?", "cat": "introduction"},
     {"ms": "Saya perasan kita serasi dari segi komunikasi. Apa pendapat anda?", "en": "I noticed we're compatible in communication style. What do you think?", "cat": "compatibility"},
@@ -71,19 +74,25 @@ async def seed_all():
     await init_db()
     async with async_session() as session:
 
-        # ── Tiers — skip if exists ──
-        tier_count = (await session.execute(select(func.count()).select_from(TierConfig))).scalar()
+        # ── Seed Tiers (skip if exists) ──
+        tier_count = (await session.execute(
+            select(func.count()).select_from(TierConfig)
+        )).scalar() or 0
+
         if tier_count == 0:
             for tier_data in TIER_SEED:
                 session.add(TierConfig(**tier_data))
-            await session.commit()
-            print(f"✓ Seeded {len(TIER_SEED)} tier configs")
+            await session.flush()
+            print(f"✓ Seeded {len(TIER_SEED)} tier configurations")
         else:
             print(f"✓ Tiers already seeded ({tier_count} found), skipping")
 
-        # ── Quiz questions — skip if exists ──
-        q_count = (await session.execute(select(func.count()).select_from(QuizQuestion))).scalar()
-        if q_count == 0:
+        # ── Seed Quiz Questions (skip if exists) ──
+        quiz_count = (await session.execute(
+            select(func.count()).select_from(QuizQuestion)
+        )).scalar() or 0
+
+        if quiz_count == 0:
             for q in QUIZ_SEED:
                 session.add(QuizQuestion(
                     domain=q["domain"],
@@ -92,13 +101,16 @@ async def seed_all():
                     sequence_number=q["seq"],
                     is_core=q["core"],
                 ))
-            await session.commit()
+            await session.flush()
             print(f"✓ Seeded {len(QUIZ_SEED)} quiz questions")
         else:
-            print(f"✓ Quiz questions already seeded ({q_count} found), skipping")
+            print(f"✓ Quiz questions already seeded ({quiz_count} found), skipping")
 
-        # ── Ice breakers — skip if exists ──
-        ib_count = (await session.execute(select(func.count()).select_from(IceBreaker))).scalar()
+        # ── Seed Ice Breakers (skip if exists) ──
+        ib_count = (await session.execute(
+            select(func.count()).select_from(IceBreaker)
+        )).scalar() or 0
+
         if ib_count == 0:
             for i, ib in enumerate(ICEBREAKER_SEED):
                 session.add(IceBreaker(
@@ -106,22 +118,24 @@ async def seed_all():
                     text_en=ib["en"],
                     category=ib["cat"],
                     sort_order=i,
+                    is_active=True,
                 ))
-            await session.commit()
+            await session.flush()
             print(f"✓ Seeded {len(ICEBREAKER_SEED)} ice breakers")
         else:
             print(f"✓ Ice breakers already seeded ({ib_count} found), skipping")
 
-        print("✅ Seed complete!")
-
-
-async def run_seed():
-    """Called from lifespan on startup. Safe to run multiple times."""
-    try:
-        await seed_all()
-    except Exception as e:
-        print(f"[Seed] Error: {e}")
+        await session.commit()
+        print("\n✅ Seed complete!")
 
 
 if __name__ == "__main__":
     asyncio.run(seed_all())
+
+
+async def run_seed():
+    """Run seed safely — skips existing data."""
+    try:
+        await seed_all()
+    except Exception as e:
+        print(f"[Seed] Error: {e}")
