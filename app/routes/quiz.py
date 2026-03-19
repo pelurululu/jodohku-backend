@@ -1,16 +1,12 @@
 """
 JODOHKU.MY — Quiz Routes
-30-question psychometric quiz with adaptive branching
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.schemas import (
-    QuizQuestionResponse, QuizAnswerRequest,
-    QuizBatchAnswerRequest, PsychometricScoreResponse
-)
+from app.schemas import QuizAnswerRequest, QuizBatchAnswerRequest, PsychometricScoreResponse
 from app.services.quiz_service import QuizService
 from app.middleware.auth import get_current_user
 
@@ -19,18 +15,14 @@ router = APIRouter(prefix="/quiz", tags=["Psychometric Quiz"])
 
 @router.get("/questions")
 async def get_quiz_questions(
-    batch: str = "core",  # "core" (first 10) or "extended" (remaining 20)
+    batch: str = "core",
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Get quiz questions for current batch.
-    - Core batch (10 questions): unlocks Bilik Pameran
-    - Extended batch (20 questions): improves matching accuracy
-    - AI-adaptive: answer patterns influence next questions
-    """
     service = QuizService(db)
-    questions = await service.get_questions(current_user.id, batch)
+    # FIX: convert string batch to int the service expects
+    batch_int = 1 if batch == "core" else 2
+    questions = await service.get_questions(current_user.id, batch_int)
     return {"questions": questions, "batch": batch}
 
 
@@ -40,22 +32,20 @@ async def submit_answer(
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Submit single quiz answer.
-    Returns next question (adaptive branching) and progress.
-    """
     service = QuizService(db)
-    result = await service.submit_answer(
+    # FIX: submit_answer only returns success/question_id/score
+    # so we fetch progress separately
+    await service.submit_answer(
         current_user.id,
         request.question_id,
         request.score,
         request.time_taken_seconds,
     )
+    progress = await service.get_progress(current_user.id)
     return {
         "saved": True,
-        "next_question": result.get("next_question"),
-        "progress": result["progress"],
-        "gallery_unlocked": result.get("gallery_unlocked", False),
+        "progress": progress,
+        "gallery_unlocked": progress.get("gallery_unlocked", False),
     }
 
 
@@ -65,18 +55,16 @@ async def submit_batch_answers(
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Submit multiple quiz answers at once."""
     service = QuizService(db)
     result = await service.submit_batch(current_user.id, request.answers)
     return result
 
 
-@router.get("/score", response_model=PsychometricScoreResponse)
+@router.get("/score")
 async def get_my_score(
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get user's psychometric score breakdown."""
     service = QuizService(db)
     return await service.get_score(current_user.id)
 
@@ -86,9 +74,5 @@ async def get_quiz_progress(
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Get quiz completion progress.
-    Shows which domains are answered and remaining questions.
-    """
     service = QuizService(db)
     return await service.get_progress(current_user.id)
