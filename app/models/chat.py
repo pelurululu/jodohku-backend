@@ -19,18 +19,18 @@ from app.database import Base
 
 
 class ConversationStatus(str, enum.Enum):
-    PENDING = "pending"       # Lamar sent, awaiting reply
-    ACTIVE = "active"         # Both parties engaged
-    EXPIRED = "expired"       # Grace period ended
-    BLOCKED = "blocked"       # One party blocked
-    CLOSED = "closed"         # Subscription expired / manually closed
+    PENDING = "pending"
+    ACTIVE = "active"
+    EXPIRED = "expired"
+    BLOCKED = "blocked"
+    CLOSED = "closed"
 
 
 class MessageStatus(str, enum.Enum):
     SENT = "sent"
     DELIVERED = "delivered"
     READ = "read"
-    BLOCKED = "blocked"       # Caught by content filter
+    BLOCKED = "blocked"
 
 
 class Conversation(Base):
@@ -39,36 +39,35 @@ class Conversation(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    
-    # Initiator (who pressed Lamar)
     initiator_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False
     )
-    # Recipient
     recipient_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False
     )
-    
     match_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("matches.id"), nullable=True
     )
-    
     status: Mapped[ConversationStatus] = mapped_column(
         Enum(ConversationStatus), default=ConversationStatus.PENDING
     )
-    
+
     # Message counts for tier enforcement
     message_count_initiator: Mapped[int] = mapped_column(Integer, default=0)
     message_count_recipient: Mapped[int] = mapped_column(Integer, default=0)
-    
+
+    # ── Added for chat_service compatibility ──
+    last_message_preview: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    message_count: Mapped[int] = mapped_column(Integer, default=0)
+
     # WhatsApp sharing status
     whatsapp_shared: Mapped[bool] = mapped_column(Boolean, default=False)
     whatsapp_requested_by: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), nullable=True
     )
-    
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
@@ -100,20 +99,12 @@ class Message(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False
     )
-    
-    # Text only — no file/image uploads in chat
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    
     status: Mapped[MessageStatus] = mapped_column(
         Enum(MessageStatus), default=MessageStatus.SENT
     )
-    
-    # If blocked by content filter, reason stored here
     blocked_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    
-    # Was this an ice-breaker message?
     is_ice_breaker: Mapped[bool] = mapped_column(Boolean, default=False)
-    
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     read_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
@@ -126,7 +117,6 @@ class Message(Base):
 
 
 class IceBreaker(Base):
-    """Pre-defined ice-breaker phrases for initiating conversation."""
     __tablename__ = "ice_breakers"
 
     id: Mapped[uuid.UUID] = mapped_column(
