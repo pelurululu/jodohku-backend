@@ -173,8 +173,27 @@ class AuthService:
 
         await redis.delete(f"otp:{email}")
 
-        ekyc_token = self._create_access_token(otp_data["user_id"], expires_minutes=30)
-        return {"ekyc_token": ekyc_token}
+        # Activate user immediately (eKYC skipped for now)
+        from uuid import UUID
+        from app.models.user import SubscriptionTier
+        result = await self.db.execute(select(User).where(User.id == UUID(otp_data["user_id"])))
+        user = result.scalar_one_or_none()
+        if user:
+            user.status = AccountStatus.ACTIVE
+            user.current_tier = SubscriptionTier.RAHMAH
+        await self.db.flush()
+
+        user_id_str = otp_data["user_id"]
+        return {
+            "access_token": self._create_access_token(user_id_str),
+            "refresh_token": self._create_refresh_token(user_id_str),
+            "token_type": "bearer",
+            "expires_in": settings.jwt_access_token_expire_minutes * 60,
+            "user_id": str(user.id),
+            "code_name": user.code_name,
+            "current_tier": user.current_tier.value,
+            "profile_completion": user.profile_completion,
+        }
 
     async def login(self, email: str, password: str, device_info: dict) -> dict:
         result = await self.db.execute(select(User).where(User.email == email))
