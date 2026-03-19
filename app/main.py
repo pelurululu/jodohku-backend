@@ -97,3 +97,13 @@ async def root():
         "message": "Pencarian Sekufu Bermula Di Sini",
         "api_docs": "/docs" if config.debug else "Disabled in production",
     }
+
+
+from app.utils.seed import run_seed
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    await run_seed()  # ← add this
+    yield
+    await close_db()
