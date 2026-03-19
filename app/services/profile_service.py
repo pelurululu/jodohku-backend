@@ -182,7 +182,7 @@ class ProfileService:
             profile.occupation, profile.income_range, profile.marital_status,
             profile.bio_text,
         ]
-        list_fields = [profile.hobbies, profile.desired_values]
+        list_fields = [profile.hobbies]
         filled = sum(1 for f in fields if f is not None)
         filled += sum(1 for f in list_fields if f and len(f) > 0)
         total = len(fields) + len(list_fields)
