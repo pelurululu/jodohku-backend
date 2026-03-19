@@ -1,6 +1,6 @@
 """
 JODOHKU.MY — Pydantic Schemas
-Request/Response validation for all API endpoints
+Fixed: ProfileResponse defaults, removed min_length on desired_values
 """
 
 from datetime import date, datetime
@@ -73,37 +73,9 @@ class ProfileUpdateRequest(BaseModel):
     dependants: Optional[int] = Field(None, ge=0, le=15)
     bio_text: Optional[str] = Field(None, max_length=500)
     hobbies: Optional[List[str]] = None
-    desired_values: Optional[List[str]] = Field(None, min_length=5, max_length=10)
+    # FIX: removed min_length=5 — was blocking profile saves
+    desired_values: Optional[List[str]] = None
     red_flags: Optional[List[str]] = None
-
-
-class ProfileResponse(BaseModel):
-    user_id: UUID
-    code_name: str
-    display_name: Optional[str]
-    gender: Optional[str]
-    age: Optional[int]
-    height_cm: Optional[int]
-    weight_kg: Optional[int]
-    state_of_residence: Optional[str]
-    education_level: Optional[str]
-    occupation: Optional[str]
-    income_range: Optional[str]
-    marital_status: Optional[str]
-    dependants: Optional[int]
-    bio_text: Optional[str]
-    hobbies: List[str]
-    photos: List["PhotoResponse"]
-    current_tier: str
-    is_verified_t20: bool
-    profile_completion: int
-    compatibility_score: Optional[float] = None
-    wingman_tip: Optional[str] = None
-    is_online: bool = False
-    last_active: Optional[str] = None
-
-    class Config:
-        from_attributes = True
 
 
 class PhotoResponse(BaseModel):
@@ -113,9 +85,39 @@ class PhotoResponse(BaseModel):
     is_blurred: bool = False
 
 
+class ProfileResponse(BaseModel):
+    user_id: UUID
+    code_name: str
+    display_name: Optional[str] = None
+    gender: Optional[str] = None
+    age: Optional[int] = None
+    height_cm: Optional[int] = None
+    weight_kg: Optional[int] = None
+    state_of_residence: Optional[str] = None
+    education_level: Optional[str] = None
+    occupation: Optional[str] = None
+    income_range: Optional[str] = None
+    marital_status: Optional[str] = None
+    dependants: Optional[int] = None
+    bio_text: Optional[str] = None
+    # FIX: default_factory=list — prevents crash when hobbies/photos is None
+    hobbies: List[str] = Field(default_factory=list)
+    photos: List[PhotoResponse] = Field(default_factory=list)
+    current_tier: str
+    is_verified_t20: bool = False
+    profile_completion: int = 0
+    compatibility_score: Optional[float] = None
+    wingman_tip: Optional[str] = None
+    is_online: bool = False
+    last_active: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class PreferenceUpdateRequest(BaseModel):
-    preferred_age_min: Optional[int] = Field(None, ge=22, le=55)
-    preferred_age_max: Optional[int] = Field(None, ge=22, le=55)
+    preferred_age_min: Optional[int] = Field(None, ge=18, le=70)
+    preferred_age_max: Optional[int] = Field(None, ge=18, le=70)
     preferred_states: Optional[List[str]] = None
     preferred_education_min: Optional[str] = None
     preferred_income_min: Optional[str] = None
@@ -148,9 +150,9 @@ class QuizBatchAnswerRequest(BaseModel):
 
 
 class PsychometricScoreResponse(BaseModel):
-    domains: dict  # { "communication": 0.85, "empathy": 0.72, ... }
-    questions_answered: int
-    confidence: float
+    domains: dict = Field(default_factory=dict)
+    questions_answered: int = 0
+    confidence: float = 0.0
 
 
 # ═══════════════════════════════════════════
@@ -167,16 +169,16 @@ class GalleryFilters(BaseModel):
 
 
 class GalleryResponse(BaseModel):
-    profiles: List[ProfileResponse]
-    total_count: int
-    page: int
-    page_size: int
-    has_next: bool
+    profiles: List[ProfileResponse] = Field(default_factory=list)
+    total_count: int = 0
+    page: int = 1
+    page_size: int = 20
+    has_next: bool = False
 
 
 class MatchActionRequest(BaseModel):
     target_user_id: UUID
-    action: str  # "like" | "reject" | "block" | "save_favorite" | "lamar"
+    action: str
 
 
 # ═══════════════════════════════════════════
@@ -186,14 +188,14 @@ class MatchActionRequest(BaseModel):
 class ConversationResponse(BaseModel):
     id: UUID
     partner_code_name: str
-    partner_photo_url: Optional[str]
+    partner_photo_url: Optional[str] = None
     partner_tier: str
     status: str
-    last_message: Optional[str]
-    last_message_at: Optional[datetime]
-    unread_count: int
-    is_online: bool
-    compatibility_score: Optional[float]
+    last_message: Optional[str] = None
+    last_message_at: Optional[datetime] = None
+    unread_count: int = 0
+    is_online: bool = False
+    compatibility_score: Optional[float] = None
 
 
 class MessageRequest(BaseModel):
@@ -212,7 +214,7 @@ class MessageResponse(BaseModel):
 
 class WhatsAppRequestAction(BaseModel):
     conversation_id: UUID
-    action: str  # "request" | "approve" | "reject"
+    action: str
 
 
 # ═══════════════════════════════════════════
@@ -223,7 +225,7 @@ class SubscriptionPlanResponse(BaseModel):
     tier: str
     price_myr: float
     duration_days: int
-    features: dict
+    features: dict = Field(default_factory=dict)
     badge_label: str
     badge_color: str
 
@@ -242,12 +244,12 @@ class PaymentCallbackData(BaseModel):
 
 class SubscriptionResponse(BaseModel):
     tier: str
-    starts_at: datetime
-    expires_at: datetime
-    grace_period_ends_at: Optional[datetime]
-    is_active: bool
-    refund_eligible: bool
-    days_remaining: int
+    starts_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    grace_period_ends_at: Optional[datetime] = None
+    is_active: bool = False
+    refund_eligible: bool = False
+    days_remaining: int = 0
 
 
 class RefundRequest(BaseModel):
@@ -263,8 +265,8 @@ class NotificationResponse(BaseModel):
     type: str
     title: str
     body: str
-    action_url: Optional[str]
-    is_read: bool
+    action_url: Optional[str] = None
+    is_read: bool = False
     created_at: datetime
 
 
@@ -275,7 +277,7 @@ class NotificationResponse(BaseModel):
 class WaliInviteRequest(BaseModel):
     wali_email: EmailStr
     wali_name: str = Field(max_length=100)
-    relation: str  # father, brother, uncle, etc.
+    relation: str
 
 
 # ═══════════════════════════════════════════
@@ -284,7 +286,7 @@ class WaliInviteRequest(BaseModel):
 
 class ReportRequest(BaseModel):
     reported_user_id: UUID
-    category: str  # fake_profile, obscene_content, financial_scam, harassment, other
+    category: str
     description: Optional[str] = Field(None, max_length=1000)
 
 
@@ -293,19 +295,19 @@ class ReportRequest(BaseModel):
 # ═══════════════════════════════════════════
 
 class AdminDashboardMetrics(BaseModel):
-    mau: int
-    dau: int
-    arpu: float
-    churn_rate: float
-    ltv: float
-    cac: float
-    ltv_cac_ratio: float
-    conversion_rate: float
-    match_rate: float
-    gender_ratio: dict
-    revenue_today: float
-    revenue_month: float
-    active_subscriptions: dict  # { "gold": 120, "platinum": 45, ... }
-    pending_reports: int
-    pending_asnaf: int
-    pending_t20: int
+    mau: int = 0
+    dau: int = 0
+    arpu: float = 0.0
+    churn_rate: float = 0.0
+    ltv: float = 0.0
+    cac: float = 0.0
+    ltv_cac_ratio: float = 0.0
+    conversion_rate: float = 0.0
+    match_rate: float = 0.0
+    gender_ratio: dict = Field(default_factory=dict)
+    revenue_today: float = 0.0
+    revenue_month: float = 0.0
+    active_subscriptions: dict = Field(default_factory=dict)
+    pending_reports: int = 0
+    pending_asnaf: int = 0
+    pending_t20: int = 0
