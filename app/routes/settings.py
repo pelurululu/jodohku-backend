@@ -1,6 +1,6 @@
 """
 JODOHKU.MY — Settings Routes
-Fixed to match frontend API calls
+Account management: password, deletion, pause, wali, report
 """
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -16,84 +16,54 @@ from app.middleware.auth import get_current_user
 router = APIRouter(prefix="/settings", tags=["Settings & Account"])
 
 
-# ── Request schemas ──
-class PasswordChangeRequest(BaseModel):
+class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
 
-class DeleteRequest(BaseModel):
+class DeleteAccountRequest(BaseModel):
     reason: str = ""
 
-class PauseRequest(BaseModel):
-    pass
 
-
-# ── Password ──
 @router.put("/password")
-@router.post("/change-password")  # keep old route too
+@router.post("/change-password")
 async def change_password(
-    request: PasswordChangeRequest,
+    request: ChangePasswordRequest,
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     service = AccountService(db)
-    await service.change_password(
-        current_user.id,
-        request.current_password,
-        request.new_password
-    )
-    return {"message": "Kata laluan berjaya ditukar."}
+    return await service.change_password(current_user.id, request.current_password, request.new_password)
 
 
-# ── Pause ──
 @router.post("/pause")
-async def pause_account(
-    current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
+async def pause_account(current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     service = AccountService(db)
-    await service.pause_account(current_user.id)
-    return {"message": "Akaun dijeda. Anda boleh kembali bila-bila masa."}
+    return await service.pause_account(current_user.id)
 
 
 @router.post("/unpause")
-async def unpause_account(
-    current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
+async def unpause_account(current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     service = AccountService(db)
-    await service.unpause_account(current_user.id)
-    return {"message": "Selamat kembali! Akaun anda telah diaktifkan semula."}
+    return await service.unpause_account(current_user.id)
 
 
-# ── Delete ──
 @router.delete("/delete")
-@router.post("/delete-account")  # keep old route too
+@router.post("/delete-account")
 async def delete_account(
+    request: DeleteAccountRequest = None,
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     service = AccountService(db)
-    await service.request_deletion(current_user.id)
-    return {
-        "message": "Permohonan pemadaman diterima. "
-                   "Data aktif dipadam dalam 72 jam. "
-                   "Sijil pemadaman akan dihantar ke emel anda."
-    }
+    return await service.request_deletion(current_user.id)
 
 
-# ── Mark married ──
 @router.post("/mark-married")
-async def mark_as_married(
-    current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
+async def mark_as_married(current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     service = AccountService(db)
-    await service.mark_married(current_user.id)
-    return {"message": "Tahniah! Profil anda akan disembunyikan dalam 24 jam."}
+    return await service.mark_married(current_user.id)
 
 
-# ── Report ──
 @router.post("/report")
 async def report_user(
     request: ReportRequest,
@@ -107,19 +77,10 @@ async def report_user(
         category=request.category,
         description=request.description,
     )
-    return {
-        "message": "Laporan diterima. Pihak pentadbir akan menyemak dalam 24 jam.",
-        "report_id": str(result["report_id"]),
-    }
+    return {"message": "Laporan diterima.", "report_id": str(result["report_id"])}
 
 
-# ── Block ──
 @router.post("/block-user/{target_user_id}")
-async def block_user(
-    target_user_id: str,
-    current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
+async def block_user(target_user_id: str, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     service = AccountService(db)
-    await service.block_user(current_user.id, target_user_id)
-    return {"message": "Pengguna telah disekat."}
+    return await service.block_user(current_user.id, target_user_id)
