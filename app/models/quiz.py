@@ -39,29 +39,14 @@ class QuizQuestion(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    
     domain: Mapped[QuizDomain] = mapped_column(Enum(QuizDomain), nullable=False)
-    
-    # Bilingual question text
     text_ms: Mapped[str] = mapped_column(Text, nullable=False)
     text_en: Mapped[str] = mapped_column(Text, nullable=False)
-    
-    # Question ordering (1-30)
     sequence_number: Mapped[int] = mapped_column(Integer, nullable=False)
-    
-    # Adaptive branching: which question to show next based on answer
-    # JSON: { "1": next_q_id, "2": next_q_id, ..., "5": next_q_id }
     branching_logic: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
-    
-    # Whether this is in the first 10 (unlocks gallery) or remaining 20
     is_core: Mapped[bool] = mapped_column(Boolean, default=False)
-    
-    # Reverse scoring flag (some questions are negatively worded)
     is_reverse_scored: Mapped[bool] = mapped_column(Boolean, default=False)
-    
-    # Weight multiplier for this question's contribution
     weight: Mapped[float] = mapped_column(Float, default=1.0)
-    
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -84,13 +69,8 @@ class QuizResponse(Base):
         UUID(as_uuid=True), ForeignKey("quiz_questions.id"),
         nullable=False
     )
-    
-    # Likert scale 1-5
     score: Mapped[int] = mapped_column(Integer, nullable=False)
-    
-    # Time taken in seconds (for behavioral analytics)
     time_taken_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user: Mapped["User"] = relationship(back_populates="quiz_responses")
@@ -103,8 +83,9 @@ class QuizResponse(Base):
 
 class PsychometricScore(Base):
     """
-    Computed vector for each user — recalculated after each quiz response.
-    This is the primary input to the cosine similarity matching engine.
+    Computed vector for each user.
+    Uses domain_scores JSONB for flexibility — quiz_service writes dict here.
+    Individual domain columns kept for direct SQL queries.
     """
     __tablename__ = "psychometric_scores"
 
@@ -115,8 +96,8 @@ class PsychometricScore(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"),
         unique=True, nullable=False
     )
-    
-    # Per-domain normalized scores (0.0 to 1.0)
+
+    # ── Individual domain scores (0.0 to 1.0) ──
     stress_management: Mapped[float] = mapped_column(Float, default=0.0)
     communication: Mapped[float] = mapped_column(Float, default=0.0)
     empathy: Mapped[float] = mapped_column(Float, default=0.0)
@@ -129,16 +110,18 @@ class PsychometricScore(Base):
     forgiveness: Mapped[float] = mapped_column(Float, default=0.0)
     resilience: Mapped[float] = mapped_column(Float, default=0.0)
     leadership: Mapped[float] = mapped_column(Float, default=0.0)
-    
-    # Full vector as JSON array for fast cosine computation
+
+    # ── JSONB dict — used by quiz_service ──
+    # { "communication": 0.85, "empathy": 0.72, ... }
+    domain_scores: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)
+
+    # ── Full vector for cosine similarity ──
     vector: Mapped[list] = mapped_column(JSONB, default=list)
-    
-    # Number of questions answered (affects confidence level)
+
     questions_answered: Mapped[int] = mapped_column(Integer, default=0)
-    
-    # Confidence score (higher = more questions answered)
     confidence: Mapped[float] = mapped_column(Float, default=0.0)
-    
+
+    computed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
