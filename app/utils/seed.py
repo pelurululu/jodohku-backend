@@ -5,6 +5,14 @@ Seeds tier configurations, quiz questions, and ice breakers.
 Run: python -m app.utils.seed
 """
 
+async def run_seed():
+    async with async_session() as db:
+        await seed_tiers(db)
+        await seed_questions(db)
+        await seed_icebreakers(db)
+        await db.commit()
+    print("[Seed] Done.")
+
 import asyncio
 import uuid
 from app.database import async_session, init_db
