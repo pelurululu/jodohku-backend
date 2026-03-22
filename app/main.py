@@ -71,6 +71,21 @@ async def health_check():
     return {"status": "operational", "version": config.app_version, "service": "Jodohku.my API"}
 
 
+@app.post("/api/v1/admin/compute-matches")
+async def compute_all_matches(db: AsyncSession = Depends(get_db)):
+    from app.services.matching_service import MatchingService
+    from app.models.user import User
+    from sqlalchemy import select
+    result = await db.execute(select(User))
+    users = result.scalars().all()
+    total = 0
+    for user in users:
+        svc = MatchingService(db)
+        n = await svc.compute_matches_for_user(user.id)
+        total += n
+    return {"users": len(users), "matches": total}
+
+
 @app.get("/")
 async def root():
     return {"message": "Pencarian Sekufu Bermula Di Sini"}
