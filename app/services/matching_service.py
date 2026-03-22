@@ -163,7 +163,7 @@ class MatchingService:
     WEIGHT_DEMOGRAPHIC = 0.20
     WEIGHT_HOBBIES = 0.10
     WEIGHT_BADGES = 0.05
-    THRESHOLD = 0.85
+    THRESHOLD = 0.30  # Lowered for testing — raise to 0.85 in production
 
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -445,3 +445,56 @@ class MatchingService:
             "photos": [],  # Populated by photo service
             "is_blurred": is_blurred,
         }
+
+
+    async def compute_matches_for_user(self, user_id: UUID) -> int:
+        """
+        Compute/update match scores between this user and ALL other active users.
+        Called after quiz answers saved. Writes to matches table.
+        Returns number of matches computed.
+        """
+        from app.models.matching import Match, MatchStatus
+
+        # Get all other active users
+        result = await self.db.execute(
+            select(User).where(
+                User.id != user_id,
+                User.status == AccountStatus.ACTIVE,
+            )
+        )
+        other_users = result.scalars().all()
+
+        computed = 0
+        for other in other_users:
+            # Skip same gender
+            profile_self = await self._get_profile(user_id)
+            profile_other = await self._get_profile(other.id)
+            if (profile_self and profile_other and
+                    profile_self.gender and profile_other.gender and
+                    profile_self.gender == profile_other.gender):
+                continue
+
+            score_data = await self.compute_match_score(user_id, other.id)
+            total = score_data["total"]
+
+            # Canonical ordering — smaller UUID is always user_a
+            a_id = user_id if str(user_id) < str(other.id) else other.id
+            b_id = other.id if str(user_id) < str(other.id) else user_id
+
+            existing = await self._find_match(a_id, b_id)
+            if existing:
+                existing.compatibility_score = total
+                existing.score_breakdown = score_data["breakdown"]
+            else:
+                self.db.add(Match(
+                    user_a_id=a_id,
+                    user_b_id=b_id,
+                    compatibility_score=total,
+                    score_breakdown=score_data["breakdown"],
+                    status_a=MatchStatus.SUGGESTED,
+                    status_b=MatchStatus.SUGGESTED,
+                ))
+            computed += 1
+
+        await self.db.flush()
+        return computed
