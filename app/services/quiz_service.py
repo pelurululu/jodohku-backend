@@ -124,6 +124,14 @@ class QuizService:
         await self.db.flush()
         await self._recalculate_score(user_id)
 
+        # Trigger match computation against all other users
+        try:
+            from app.services.matching_service import MatchingService
+            matching_svc = MatchingService(self.db)
+            await matching_svc.compute_matches_for_user(user_id)
+        except Exception as e:
+            print(f"[Quiz] Match compute skipped: {e}")
+
         return {"success": True, "question_id": str(question_id), "score": score}
 
     async def submit_batch(self, user_id: UUID, answers: list) -> dict:
