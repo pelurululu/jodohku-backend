@@ -31,6 +31,7 @@ class MatchStatus(str, enum.Enum):
 class InteractionType(str, enum.Enum):
     VIEW = "view"
     LIKE = "like"
+    UNLIKE = "unlike"
     LAMAR = "lamar"
     REJECT = "reject"
     BLOCK = "block"
