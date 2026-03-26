@@ -80,9 +80,11 @@ async def logout(
 
 @router.post("/forgot-password")
 async def forgot_password(
-    email: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
+    data = await request.json()
+    email = data.get("email", "")
     service = AuthService(db)
     await service.send_password_reset(email)
     return {"message": "Jika akaun wujud, OTP telah dihantar."}
@@ -90,11 +92,17 @@ async def forgot_password(
 
 @router.post("/reset-password")
 async def reset_password(
-    email: str,
-    otp_code: str,
-    new_password: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
+    data = await request.json()
+    email = data.get("email", "")
+    otp_code = data.get("otp_code", "")
+    new_password = data.get("new_password", "")
+    if not email or not otp_code or not new_password:
+        raise HTTPException(status_code=400, detail="Sila isi semua medan.")
+    if len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="Kata laluan minimum 8 aksara.")
     service = AuthService(db)
     await service.reset_password(email, otp_code, new_password)
     return {"message": "Kata laluan berjaya ditukar."}
