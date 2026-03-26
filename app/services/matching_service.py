@@ -296,22 +296,32 @@ class MatchingService:
         # Log interaction
         interaction_map = {
             "like": InteractionType.LIKE,
+            "unlike": InteractionType.UNLIKE,
             "reject": InteractionType.REJECT,
             "block": InteractionType.BLOCK,
             "save_favorite": InteractionType.SAVE_FAVORITE,
             "lamar": InteractionType.LAMAR,
         }
-        
+
         interaction = MatchInteraction(
             actor_id=actor_id,
             target_id=target_id,
             interaction_type=interaction_map.get(action, InteractionType.VIEW),
         )
         self.db.add(interaction)
-        
+
         if action == "save_favorite":
             fav = Favorite(user_id=actor_id, target_id=target_id)
             self.db.add(fav)
+
+        if action == "unlike":
+            from sqlalchemy import delete
+            await self.db.execute(
+                delete(Favorite).where(
+                    Favorite.user_id == actor_id,
+                    Favorite.target_id == target_id,
+                )
+            )
         
         if action == "block":
             # Update match status
