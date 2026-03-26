@@ -182,6 +182,7 @@ class AuthService:
             user.status = AccountStatus.ACTIVE
             user.current_tier = SubscriptionTier.RAHMAH
         await self.db.flush()
+        await self.db.commit()
 
         user_id_str = otp_data["user_id"]
         return {
@@ -227,7 +228,7 @@ class AuthService:
             "refresh_token": self._create_refresh_token(user_id_str),
             "token_type": "bearer",
             "expires_in": settings.jwt_access_token_expire_minutes * 60,
-            "user_id": user.id,
+            "user_id": user_id_str,
             "code_name": user.code_name,
             "current_tier": user.current_tier.value,
             "profile_completion": user.profile_completion,
@@ -248,7 +249,7 @@ class AuthService:
                 "refresh_token": self._create_refresh_token(user_id),
                 "token_type": "bearer",
                 "expires_in": settings.jwt_access_token_expire_minutes * 60,
-                "user_id": user.id,
+                "user_id": str(user.id),
                 "code_name": user.code_name,
                 "current_tier": user.current_tier.value,
                 "profile_completion": user.profile_completion,
@@ -257,7 +258,19 @@ class AuthService:
             raise HTTPException(status_code=401, detail="Token tidak sah atau telah tamat.")
 
     async def logout(self, token: str):
-        pass
+        if not token:
+            return
+        try:
+            payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+            exp = payload.get("exp")
+            if exp:
+                from datetime import timezone
+                ttl = int(exp - datetime.now(timezone.utc).timestamp())
+                if ttl > 0:
+                    redis = await get_redis()
+                    await redis.setex(f"blocklist:{token}", ttl, "1")
+        except Exception:
+            pass
 
     async def send_password_reset(self, email: str):
         result = await self.db.execute(select(User).where(User.email == email))
