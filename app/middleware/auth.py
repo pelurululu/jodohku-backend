@@ -32,17 +32,34 @@ async def get_current_user(
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token telah tamat atau tidak sah.")
 
+    # Check token blocklist (populated on logout)
+    try:
+        import redis.asyncio as aioredis
+        redis = aioredis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
+        if await redis.exists(f"blocklist:{token}"):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token tidak sah. Sila log masuk semula.")
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # Redis unavailable — allow through rather than block all traffic
+
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
 
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Pengguna tidak ditemui.")
 
-    # FIX: Auto-activate PENDING_EKYC users (eKYC skipped)
+    # eKYC skip: auto-activate PENDING_EKYC users only when explicitly configured
     if user.status == AccountStatus.PENDING_EKYC:
-        user.status = AccountStatus.ACTIVE
-        user.current_tier = SubscriptionTier.RAHMAH
-        await db.flush()
+        if getattr(settings, "skip_ekyc", True):
+            user.status = AccountStatus.ACTIVE
+            user.current_tier = SubscriptionTier.RAHMAH
+            await db.flush()
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Akaun belum disahkan. Sila lengkapkan e-KYC.",
+            )
 
     if user.status == AccountStatus.SUSPENDED:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Akaun anda telah digantung.")
