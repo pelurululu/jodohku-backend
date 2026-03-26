@@ -6,7 +6,7 @@ Text-only messaging with content filtering and strike enforcement
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -102,22 +102,27 @@ async def send_message(
 
 @router.post("/initiate")
 async def initiate_conversation(
-    target_user_id: UUID,
-    message: MessageRequest,
+    request: Request,
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Initiate conversation (Lamar).
-    Requires at least 1 message (ice-breaker or custom).
-    Target receives notification.
+    Accepts: { target_user_id, message: { content, is_ice_breaker } }
     """
+    body = await request.json()
+    from uuid import UUID as _UUID
+    target_user_id = _UUID(str(body.get("target_user_id", "")))
+    msg = body.get("message", {})
+    content = msg.get("content", "Assalamualaikum.")
+    is_ice_breaker = msg.get("is_ice_breaker", False)
+
     service = ChatService(db)
     result = await service.initiate_conversation(
         initiator_id=current_user.id,
         target_id=target_user_id,
-        first_message=message.content,
-        is_ice_breaker=message.is_ice_breaker,
+        first_message=content,
+        is_ice_breaker=is_ice_breaker,
         initiator_tier=current_user.current_tier,
     )
     return result
