@@ -78,11 +78,24 @@ async def send_notification(
     recipient_id = body.get("recipient_user_id")
     if not recipient_id:
         return {"status": "skipped"}
+
+    conv_id = body.get("conversation_id", "")
+    sender_name = body.get("sender_name", current_user.code_name or "Seseorang")
+    title = body.get("title", "Notifikasi baharu")
+    notif_body = body.get("body", "")
+
     service = NotificationService(db)
-    await service.create_notification(
+    await service.send_notification(
         user_id=_UUID(str(recipient_id)),
-        notif_type=body.get("type", "lamar_received"),
-        title=body.get("title", "Notifikasi baharu"),
-        body=body.get("body", ""),
+        type=body.get("type", "lamar_received"),
+        title_ms=title,
+        title_en=title,
+        body_ms=notif_body,
+        body_en=notif_body,
+        data={
+            "conversation_id": conv_id,
+            "sender_name": sender_name,
+            "sender_code": current_user.code_name,
+        },
     )
     return {"status": "sent"}
