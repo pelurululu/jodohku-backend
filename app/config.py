@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     # ── ToyyibPay ──
     toyyibpay_secret_key: str = ""
     toyyibpay_category_code: str = ""
-    toyyibpay_base_url: str = "https://dev.toyyibpay.com"
+    toyyibpay_base_url: str = "https://toyyibpay.com"
     toyyibpay_callback_url: str = ""
 
     # ── Billplz (Failover) ──
