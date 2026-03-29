@@ -24,7 +24,18 @@ class ProfileService:
             raise HTTPException(status_code=404, detail="Pengguna tidak ditemui.")
 
         profile = await self._get_profile(user_id)
-        photos = []  # TODO: join with photos table when implemented
+
+        # Load approved photos from DB
+        from app.models.user import UserPhoto
+        photo_result = await self.db.execute(
+            select(UserPhoto).where(
+                UserPhoto.user_id == user_id,
+                UserPhoto.is_approved == True,
+            ).order_by(UserPhoto.sort_order)
+        )
+        raw_photos = photo_result.scalars().all()
+        photos = [{"url": p.file_url, "photo_type": p.photo_type.value, "id": str(p.id)} for p in raw_photos]
+        photo_url = photos[0]["url"] if photos else None
 
         age = None
         if profile and profile.date_of_birth:
@@ -59,6 +70,7 @@ class ProfileService:
             "desired_values": profile.desired_values if profile else [],
             "red_flags": profile.red_flags if profile else [],
             "photos": photos,
+            "photo_url": photo_url,
             "current_tier": user.current_tier.value,
             "is_verified_t20": user.is_verified_t20,
             "profile_completion": user.profile_completion,
