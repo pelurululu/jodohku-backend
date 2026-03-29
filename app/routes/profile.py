@@ -70,6 +70,64 @@ async def get_completion_status(
     return await service.get_completion_breakdown(current_user.id)
 
 
+@router.post("/photo")
+async def upload_photo_base64(
+    request: dict,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Accept base64 photo from frontend crop tool.
+    Upserts a UserPhoto record with is_approved=True.
+    file_url stores the data-URL so it is immediately usable.
+    """
+    from app.models.user import UserPhoto, PhotoType
+    from sqlalchemy import select, delete
+
+    photo_data: str = request.get("photo_data", "")
+    photo_type_str: str = request.get("photo_type", "headshot")
+
+    if not photo_data:
+        raise HTTPException(status_code=400, detail="photo_data diperlukan.")
+
+    # Ensure it's a valid data URL; prefix if raw base64
+    if not photo_data.startswith("data:"):
+        photo_data = "data:image/jpeg;base64," + photo_data
+
+    # Map string → enum (default to HEADSHOT)
+    try:
+        photo_type = PhotoType(photo_type_str)
+    except ValueError:
+        photo_type = PhotoType.HEADSHOT
+
+    # Delete existing photos of the same type so there's only ever one headshot
+    await db.execute(
+        delete(UserPhoto).where(
+            UserPhoto.user_id == current_user.id,
+            UserPhoto.photo_type == photo_type,
+        )
+    )
+
+    new_photo = UserPhoto(
+        user_id=current_user.id,
+        photo_type=photo_type,
+        file_path=f"base64/{current_user.id}/{photo_type.value}",
+        file_url=photo_data,          # data-URL — served directly to clients
+        is_approved=True,             # auto-approve own photo upload
+        ai_moderation_passed=True,
+        sort_order=0,
+    )
+    db.add(new_photo)
+    await db.flush()
+
+    return {
+        "success": True,
+        "photo_id": str(new_photo.id),
+        "photo_url": photo_data,
+        "message": "Gambar profil berjaya disimpan.",
+    }
+
+
 @router.get("/{code_name}")
 async def get_profile_by_code(
     code_name: str,
