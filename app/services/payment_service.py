@@ -90,7 +90,7 @@ class PaymentService:
             return {
                 "success": True,
                 "tier": tier,
-                "payment_url": f"https://toyyibpay.com/{bill_code}",
+                "payment_url": f"{settings.toyyibpay_base_url}/{bill_code}",
                 "transaction_id": str(txn.id),
                 "bill_code": bill_code,
                 "amount": price,
