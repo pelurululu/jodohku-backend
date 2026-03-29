@@ -22,8 +22,10 @@ async def get_quiz_questions(
     service = QuizService(db)
     # FIX: convert string batch to int the service expects
     batch_int = 1 if batch == "core" else 2
-    questions = await service.get_questions(current_user.id, batch_int)
-    return {"questions": questions, "batch": batch}
+    result = await service.get_questions(current_user.id, batch_int)
+    # service already returns {"questions": [...], "total": n, "answered": n}
+    # spread it so the frontend gets d.questions as a plain array, not nested
+    return {**result, "batch": batch}
 
 
 @router.post("/answer")
