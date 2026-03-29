@@ -54,10 +54,22 @@ async def payment_return(
     order_id: str = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """Handle redirect back from payment gateway."""
+    """Handle redirect back from payment gateway (ToyyibPay sandbox)."""
+    from fastapi.responses import RedirectResponse
+    from app.config import get_settings
+    cfg = get_settings()
+
     if status_id == "1":
-        return {"status": "success", "message": "Pembayaran berjaya! Langganan anda telah diaktifkan."}
-    return {"status": "pending", "message": "Pembayaran sedang diproses."}
+        # Process the successful payment
+        if billcode:
+            service = PaymentService(db)
+            await service.process_callback(gateway="toyyibpay", data={
+                "billcode": billcode,
+                "status_id": "1",
+                "refno": order_id or "",
+            })
+        return RedirectResponse(url=f"{cfg.frontend_url}?payment=success")
+    return RedirectResponse(url=f"{cfg.frontend_url}?payment=pending")
 
 
 @router.post("/callback")
