@@ -2,8 +2,9 @@
 JODOHKU.MY — Main Application Entry Point
 """
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -72,6 +73,24 @@ app.include_router(admin.router,              prefix=API_PREFIX)
 @app.get("/health")
 async def health_check():
     return {"status": "operational", "version": config.app_version, "service": "Jodohku.my API"}
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Ensure CORS headers are present even on 500 errors, preventing false CORS failures."""
+    origin = request.headers.get("origin", "")
+    allowed = [
+        "https://jodohku.my", "https://www.jodohku.my",
+        "http://localhost:3000", "http://localhost:5500",
+        "http://127.0.0.1:5500",
+    ]
+    cors_origin = origin if origin in allowed else ""
+    headers = {"Access-Control-Allow-Origin": cors_origin} if cors_origin else {}
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Ralat dalaman pelayan. Sila cuba semula."},
+        headers=headers,
+    )
 
 
 @app.post("/api/v1/admin/compute-matches")
