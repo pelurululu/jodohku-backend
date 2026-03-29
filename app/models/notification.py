@@ -28,6 +28,9 @@ class NotificationType(str, enum.Enum):
     WALI_INVITATION = "wali_invitation"
     GOLDEN_TICKET = "golden_ticket"
     BADGE_EARNED = "badge_earned"
+    LAMAR_RECEIVED = "lamar_received"
+    LAMAR_ACCEPTED = "lamar_accepted"
+    LAMAR_REJECTED = "lamar_rejected"
 
 
 class Notification(Base):
