@@ -84,14 +84,28 @@ class ChatService:
             is_blurred = tier == SubscriptionTier.RAHMAH.value
             is_online = partner.last_active_at and (datetime.utcnow() - partner.last_active_at).seconds < 300
 
+            # Get partner display name from profile
+            from app.models.user import UserProfile
+            profile_result = await self.db.execute(
+                _select(UserProfile).where(UserProfile.user_id == partner_id)
+            )
+            partner_profile = profile_result.scalar_one_or_none()
+            partner_display_name = (
+                partner_profile.display_name
+                if partner_profile and partner_profile.display_name
+                else partner.code_name
+            )
+
             items.append({
                 "id": str(c.id),
                 "partner_user_id": str(partner_id),
                 "partner_code_name": partner.code_name,
+                "partner_display_name": partner_display_name,
                 "partner_photo_url": photo_url if not is_blurred else None,
                 "partner_tier": partner.current_tier.value,
                 "partner": {
                     "code": partner.code_name,
+                    "name": partner_display_name,
                     "score": None,
                     "online": is_online,
                     "photo_url": photo_url if not is_blurred else None,
