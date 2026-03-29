@@ -69,18 +69,33 @@ class ChatService:
                 )
             )).scalar() or 0
 
+            # Get partner's first approved photo
+            from app.models.user import UserPhoto
+            from sqlalchemy import select as _select
+            photo_result = await self.db.execute(
+                _select(UserPhoto).where(
+                    UserPhoto.user_id == partner_id,
+                    UserPhoto.is_approved == True,
+                ).order_by(UserPhoto.sort_order).limit(1)
+            )
+            partner_photo = photo_result.scalar_one_or_none()
+            photo_url = partner_photo.file_url if partner_photo else None
+
             is_blurred = tier == SubscriptionTier.RAHMAH.value
             is_online = partner.last_active_at and (datetime.utcnow() - partner.last_active_at).seconds < 300
 
             items.append({
                 "id": str(c.id),
+                "partner_user_id": str(partner_id),
                 "partner_code_name": partner.code_name,
-                "partner_photo_url": None,
+                "partner_photo_url": photo_url if not is_blurred else None,
                 "partner_tier": partner.current_tier.value,
                 "partner": {
                     "code": partner.code_name,
                     "score": None,
                     "online": is_online,
+                    "photo_url": photo_url if not is_blurred else None,
+                    "user_id": str(partner_id),
                 },
                 "status": c.status.value,
                 "last_message": c.last_message_preview,
