@@ -128,6 +128,98 @@ async def initiate_conversation(
     return result
 
 
+@router.post("/conversations/{conversation_id}/accept")
+async def accept_conversation(
+    conversation_id: UUID,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Recipient accepts a lamar request.
+    Conversation moves from PENDING → ACTIVE.
+    Initiator receives a lamar_accepted notification.
+    """
+    from sqlalchemy import select, update
+    from app.models.chat import Conversation, ConversationStatus
+    from app.services.notification_service import NotificationService
+    from app.models.notification import NotificationType
+
+    result = await db.execute(
+        select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.recipient_id == current_user.id,
+        )
+    )
+    convo = result.scalar_one_or_none()
+    if not convo:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Perbualan tidak dijumpai.")
+    if convo.status.value != "pending":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Perbualan bukan dalam status menunggu.")
+
+    convo.status = ConversationStatus.ACTIVE
+    await db.flush()
+
+    # Notify initiator
+    notif_svc = NotificationService(db)
+    await notif_svc.send_notification(
+        user_id=convo.initiator_id,
+        type=NotificationType.LAMAR_ACCEPTED.value,
+        title_ms="Lamaran anda diterima!",
+        title_en="Your proposal was accepted!",
+        body_ms=f"{current_user.code_name} telah menerima lamaran anda. Mulakan perbualan sekarang.",
+        body_en=f"{current_user.code_name} accepted your proposal.",
+        action_url=f"/chat/{str(conversation_id)}",
+    )
+
+    return {"status": "accepted", "conversation_id": str(conversation_id)}
+
+
+@router.post("/conversations/{conversation_id}/reject")
+async def reject_conversation(
+    conversation_id: UUID,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Recipient rejects a lamar request.
+    Conversation moves from PENDING → CLOSED.
+    Initiator receives a lamar_rejected notification.
+    """
+    from sqlalchemy import select
+    from app.models.chat import Conversation, ConversationStatus
+    from app.services.notification_service import NotificationService
+    from app.models.notification import NotificationType
+
+    result = await db.execute(
+        select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.recipient_id == current_user.id,
+        )
+    )
+    convo = result.scalar_one_or_none()
+    if not convo:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Perbualan tidak dijumpai.")
+
+    convo.status = ConversationStatus.CLOSED
+    await db.flush()
+
+    # Notify initiator
+    notif_svc = NotificationService(db)
+    await notif_svc.send_notification(
+        user_id=convo.initiator_id,
+        type=NotificationType.LAMAR_REJECTED.value,
+        title_ms="Lamaran anda tidak diterima.",
+        title_en="Your proposal was not accepted.",
+        body_ms="Jangan berputus asa. Teruskan mencari jodoh yang sesuai.",
+        body_en="Don't give up. Keep searching.",
+    )
+
+    return {"status": "rejected"}
+
+
 @router.get("/ice-breakers")
 async def get_ice_breakers(
     db: AsyncSession = Depends(get_db),
