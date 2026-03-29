@@ -147,6 +147,23 @@ class ChatService:
         if not convo:
             raise Exception("Perbualan tidak ditemui.")
 
+        # Block messaging until recipient accepts
+        if convo.status == ConversationStatus.PENDING:
+            return {
+                "sent": False,
+                "blocked": True,
+                "reason_ms": "Lamaran masih menunggu kelulusan. Anda boleh berbual setelah diterima.",
+                "reason_en": "Proposal is pending acceptance. Chat will unlock once accepted.",
+            }
+
+        if convo.status == ConversationStatus.CLOSED:
+            return {
+                "sent": False,
+                "blocked": True,
+                "reason_ms": "Perbualan ini telah ditutup.",
+                "reason_en": "This conversation has been closed.",
+            }
+
         # Tier message limits
         tier_limits = {
             SubscriptionTier.RAHMAH.value: 10,
@@ -174,8 +191,6 @@ class ChatService:
         # Update conversation
         convo.last_message_preview = content[:100]
         convo.last_message_at = datetime.utcnow()
-        if convo.status == ConversationStatus.PENDING:
-            convo.status = ConversationStatus.ACTIVE
         convo.message_count = (convo.message_count or 0) + 1
 
         await self.db.flush()
