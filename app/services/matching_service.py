@@ -399,6 +399,20 @@ class MatchingService:
         )
         return result.scalar_one_or_none()
 
+    async def _get_user_photos(self, user_id: UUID, is_blurred: bool = False) -> list:
+        """Fetch approved photos for a user. Returns blurred placeholders for Rahmah viewers."""
+        from app.models.user import UserPhoto
+        result = await self.db.execute(
+            select(UserPhoto).where(
+                UserPhoto.user_id == user_id,
+                UserPhoto.is_approved == True,
+            ).order_by(UserPhoto.sort_order)
+        )
+        photos = result.scalars().all()
+        if is_blurred:
+            return [{"url": None, "is_blurred": True} for _ in photos]
+        return [{"url": p.file_url, "is_blurred": False} for p in photos]
+
     async def _get_psychometric(self, user_id: UUID):
         result = await self.db.execute(
             select(PsychometricScore).where(PsychometricScore.user_id == user_id)
@@ -452,7 +466,8 @@ class MatchingService:
             "profile_completion": user.profile_completion,
             "compatibility_score": compatibility,
             "wingman_tip": wingman_tip_ms,
-            "photos": [],  # Populated by photo service
+            "photos": await self._get_user_photos(user_id, is_blurred),
+            "photo_url": ((await self._get_user_photos(user_id, is_blurred)) or [{}])[0].get("url"),
             "is_blurred": is_blurred,
         }
 
