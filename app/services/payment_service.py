@@ -184,7 +184,8 @@ class PaymentService:
     # ── Helpers ──
 
     async def _create_toyyibpay_bill(self, amount: float, transaction_id: str, description: str) -> Optional[str]:
-        if not settings.toyyibpay_secret_key:
+        if not settings.toyyibpay_secret_key or not settings.toyyibpay_category_code:
+            print("[ToyyibPay] TOYYIBPAY_SECRET_KEY or TOYYIBPAY_CATEGORY_CODE not set in environment.")
             return None
         try:
             async with httpx.AsyncClient() as client:
